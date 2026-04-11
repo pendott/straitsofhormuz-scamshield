@@ -1,0 +1,564 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Straits Of Hormuz Team - Scam Shield</title>
+
+    <!-- React CDN -->
+    <script src="https://unpkg.com/react@18/umd/react.development.js"></script>
+    <script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
+
+    <!-- Babel CDN -->
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+
+    <!-- Tailwind CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+
+    <!-- Screenshot CDN -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+</head>
+
+<body class="min-h-screen">
+    <div id="root"></div>
+
+    <script type="text/babel">
+        function App() {
+            const { useState, useRef, useEffect } = React;
+
+            const introMessage =
+                "Welcome. Paste a suspicious message and Scam Shield will estimate the scam risk.";
+
+            const [messages, setMessages] = useState([
+                {
+                    sender: "bot",
+                    type: "intro",
+                    text: introMessage
+                }
+            ]);
+
+            const [input, setInput] = useState("");
+            const [loading, setLoading] = useState(false);
+            const [showModal, setShowModal] = useState(true);
+
+            const phoneRef = useRef(null);
+            const endRef = useRef(null);
+
+            const backendUrl = "https://cal.pendot.xyz/api/analyze";
+
+            const presets = [
+                {
+                    label: "Fake Bank Scam",
+                    text: "URGENT: Your bank account has been suspended. Click this link now and verify your OTP immediately to avoid permanent deactivation."
+                },
+                {
+                    label: "Fake Parcel Scam",
+                    text: "Your parcel is being held by customs. Pay RM5.50 now through this link to release delivery today."
+                },
+                {
+                    label: "Fake Police Scam",
+                    text: "Final notice from police department: your number is linked to an active case. Transfer payment immediately to avoid arrest."
+                },
+                {
+                    label: "Safe Message",
+                    text: "Hey bro, are we still meeting tonight at 8pm for dinner?"
+                }
+            ];
+
+            const riskStyles = {
+                high: {
+                    badge: "bg-red-100 text-red-700 border border-red-200",
+                    card: "border-red-200 bg-red-50/80",
+                    bar: "bg-red-500",
+                    icon: "🚨"
+                },
+                medium: {
+                    badge: "bg-amber-100 text-amber-700 border border-amber-200",
+                    card: "border-amber-200 bg-amber-50/80",
+                    bar: "bg-amber-500",
+                    icon: "⚠️"
+                },
+                low: {
+                    badge: "bg-emerald-100 text-emerald-700 border border-emerald-200",
+                    card: "border-emerald-200 bg-emerald-50/80",
+                    bar: "bg-emerald-500",
+                    icon: "✅"
+                }
+            };
+
+            useEffect(() => {
+                endRef.current?.scrollIntoView({ behavior: "smooth" });
+            }, [messages, loading]);
+
+            const analyzeMessage = async (textToAnalyze) => {
+                const trimmed = textToAnalyze.trim();
+                if (!trimmed || loading) return;
+
+                setMessages((prev) => [
+                    ...prev,
+                    { sender: "user", type: "text", text: trimmed }
+                ]);
+
+                setLoading(true);
+
+                try {
+                    const res = await fetch(backendUrl, {
+                        method: "POST",
+                        headers: { "Content-Type": "application/json" },
+                        body: JSON.stringify({ message: trimmed })
+                    });
+
+                    if (!res.ok) {
+                        throw new Error("Backend returned an error");
+                    }
+
+                    const data = await res.json();
+
+                    const tone =
+                        data.risk_level === "High"
+                            ? "high"
+                            : data.risk_level === "Medium"
+                                ? "medium"
+                                : "low";
+
+                    setMessages((prev) => [
+                        ...prev,
+                        {
+                            sender: "bot",
+                            type: "result",
+                            verdict: data.verdict,
+                            scam_type: data.scam_type,
+                            risk_level: data.risk_level,
+                            risk_score: data.risk_score,
+                            reasons: data.reasons || [],
+                            safe_action: data.safe_action,
+                            tone
+                        }
+                    ]);
+                } catch (error) {
+                    console.error("Fetch failed:", error);
+                    setMessages((prev) => [
+                        ...prev,
+                        {
+                            sender: "bot",
+                            type: "error",
+                            text: "Backend not connected. Check that FastAPI is running and reachable on the network."
+                        }
+                    ]);
+                } finally {
+                    setLoading(false);
+                }
+            };
+
+            const send = async () => {
+                const trimmed = input.trim();
+                if (!trimmed || loading) return;
+                setInput("");
+                await analyzeMessage(trimmed);
+            };
+
+            const usePreset = async (presetText) => {
+                if (loading) return;
+                setInput("");
+                await analyzeMessage(presetText);
+            };
+
+            const clearChat = () => {
+                if (loading) return;
+                setMessages([
+                    {
+                        sender: "bot",
+                        type: "intro",
+                        text: introMessage
+                    }
+                ]);
+                setInput("");
+            };
+
+            const startDemo = async () => {
+                if (loading) return;
+                setShowModal(false);
+                setMessages([
+                    {
+                        sender: "bot",
+                        type: "intro",
+                        text: introMessage
+                    }
+                ]);
+                setInput("");
+
+                setTimeout(() => {
+                    analyzeMessage(presets[0].text);
+                }, 250);
+            };
+
+            const onKeyDown = (e) => {
+                if (e.key === "Enter" && !e.shiftKey) {
+                    e.preventDefault();
+                    send();
+                }
+            };
+
+            const screenshot = async () => {
+                if (!phoneRef.current) return;
+
+                const canvas = await html2canvas(phoneRef.current, {
+                    scale: 2,
+                    backgroundColor: null
+                });
+
+                const link = document.createElement("a");
+                link.download = "straits-of-hormuz-scam-shield.png";
+                link.href = canvas.toDataURL("image/png");
+                link.click();
+            };
+
+            const TeamLogo = ({ small = false }) => (
+                <div
+                    className={`overflow-hidden bg-white border border-white/60 shadow-sm ${small
+                        ? "w-10 h-10 rounded-full"
+                        : "w-16 h-16 sm:w-20 sm:h-20 rounded-2xl"
+                        }`}
+                >
+                    <img
+                        src="image.png"
+                        alt="Straits Of Hormuz Team Logo"
+                        className={`w-full h-full ${small ? "object-cover" : "object-contain"}`}
+                    />
+                </div>
+            );
+
+            const renderMessage = (m, i) => {
+                if (m.type === "result") {
+                    const styles = riskStyles[m.tone] || riskStyles.medium;
+
+                    return (
+                        <div key={i} className="flex justify-start">
+                            <div className={`w-full max-w-[88%] rounded-3xl border p-4 shadow-sm ${styles.card}`}>
+                                <div className="flex items-start justify-between gap-3">
+                                    <div className="flex items-center gap-3">
+                                        <div className="w-11 h-11 rounded-2xl bg-white/80 flex items-center justify-center text-xl shadow-sm border border-white/70">
+                                            {styles.icon}
+                                        </div>
+                                        <div className="text-left">
+                                            <div className="text-sm font-semibold text-zinc-900">{m.verdict}</div>
+                                            <div className="text-xs text-zinc-500 mt-0.5">{m.scam_type}</div>
+                                        </div>
+                                    </div>
+
+                                    <div className={`shrink-0 rounded-full px-2.5 py-1 text-[11px] font-semibold ${styles.badge}`}>
+                                        {m.risk_level} Risk
+                                    </div>
+                                </div>
+
+                                <div className="mt-4">
+                                    <div className="flex items-center justify-between text-xs text-zinc-500 mb-1.5">
+                                        <span>Scam probability</span>
+                                        <span className="font-semibold text-zinc-800">{m.risk_score}%</span>
+                                    </div>
+                                    <div className="h-2.5 w-full rounded-full bg-white/80 overflow-hidden border border-white/70">
+                                        <div
+                                            className={`h-full rounded-full ${styles.bar}`}
+                                            style={{ width: `${Math.max(6, Math.min(100, m.risk_score))}%` }}
+                                        ></div>
+                                    </div>
+                                </div>
+
+                                <div className="mt-4 rounded-2xl bg-white/70 border border-white/80 p-3 text-left">
+                                    <div className="text-[11px] uppercase tracking-wide text-zinc-500">
+                                        Why it was flagged
+                                    </div>
+                                    <ul className="mt-2 space-y-1.5 text-sm text-zinc-700">
+                                        {m.reasons.map((reason, idx) => (
+                                            <li key={idx} className="flex gap-2">
+                                                <span className="text-zinc-400">•</span>
+                                                <span>{reason}</span>
+                                            </li>
+                                        ))}
+                                    </ul>
+                                </div>
+
+                                <div className="mt-3 rounded-2xl bg-zinc-900 text-white p-3 text-left">
+                                    <div className="text-[11px] uppercase tracking-wide text-white/60">
+                                        Recommended action
+                                    </div>
+                                    <div className="mt-1.5 text-sm leading-relaxed text-white/90">
+                                        {m.safe_action}
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    );
+                }
+
+                const bubbleClass =
+                    m.sender === "user"
+                        ? "bg-zinc-900 text-white rounded-br-md"
+                        : m.type === "error"
+                            ? "bg-red-50 text-red-700 border border-red-200 rounded-bl-md"
+                            : "bg-white text-zinc-800 border border-zinc-200 rounded-bl-md";
+
+                return (
+                    <div
+                        key={i}
+                        className={`flex ${m.sender === "user" ? "justify-end" : "justify-start"}`}
+                    >
+                        <div
+                            className={`max-w-[82%] whitespace-pre-line rounded-2xl px-4 py-3 text-sm leading-relaxed shadow-sm ${bubbleClass}`}
+                        >
+                            {m.text}
+                        </div>
+                    </div>
+                );
+            };
+
+            return (
+                <div
+                    className="min-h-screen"
+                    style={{
+                        background: "linear-gradient(135deg, #fff7f0 0%, #f5efff 45%, #eefbf4 100%)"
+                    }}
+                >
+                    {showModal && (
+                        <div className="fixed inset-0 z-50 flex items-start sm:items-center justify-center bg-zinc-950/55 backdrop-blur-md p-3 sm:p-4 overflow-y-auto">
+                            <div className="w-full max-w-md sm:max-w-2xl rounded-2xl sm:rounded-[2rem] border border-white/20 bg-white/95 shadow-[0_20px_60px_rgba(0,0,0,0.35)] overflow-hidden mt-4 sm:mt-0">
+                                <div className="bg-[linear-gradient(135deg,#111827_0%,#1f2937_50%,#0f172a_100%)] px-4 py-5 sm:px-6 sm:py-6 text-white">
+                                    <div className="flex flex-col sm:flex-row items-center gap-4">
+                                        <div className="scale-90 sm:scale-100">
+                                            <TeamLogo />
+                                        </div>
+
+                                        <div className="text-center sm:text-left">
+                                            <div className="inline-flex items-center gap-2 rounded-full bg-white/10 border border-white/10 px-3 py-1 text-[10px] sm:text-xs tracking-wide uppercase">
+                                                AI Hackathon Prototype
+                                            </div>
+                                            <h2 className="mt-3 text-2xl sm:text-3xl font-bold tracking-tight">Scam Shield</h2>
+                                            <p className="mt-2 text-white/75 text-sm leading-relaxed max-w-xl">
+                                                An AI-powered mobile-first scam detection experience that scores suspicious messages,
+                                                explains why they look risky, and produces presentation-ready evidence cards.
+                                            </p>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <div className="px-4 py-4 sm:px-6 sm:py-5">
+                                    <div className="flex items-center gap-3 mb-4">
+                                        <div className="h-px flex-1 bg-zinc-200"></div>
+                                        <div className="text-[10px] sm:text-xs font-semibold tracking-[0.2em] uppercase text-zinc-400">
+                                            Team
+                                        </div>
+                                        <div className="h-px flex-1 bg-zinc-200"></div>
+                                    </div>
+
+                                    <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3">
+                                        {[
+                                            { name: "Afendi", role: "Backend Development / Front End Intergrations / AI System Intergrations" },
+                                            { name: "Adam", role: "AI Model Development / Data Preparations / Research and testing" },
+                                            { name: "Hafiz", role: "Presentation Design / User Experince Review / Usability Feedback" }
+                                        ].map((member) => (
+                                            <div key={member.name} className="rounded-2xl border border-zinc-200 bg-zinc-50/80 p-3 shadow-sm">
+                                                <div className="flex items-center gap-3">
+                                                    <div className="w-9 h-9 rounded-full bg-zinc-900 text-white flex items-center justify-center text-sm font-bold">
+                                                        {member.name[0]}
+                                                    </div>
+                                                    <div className="text-left min-w-0">
+                                                        <div className="font-semibold text-zinc-900 text-sm">{member.name}</div>
+                                                        <div className="text-[11px] text-zinc-500">Core Builder</div>
+                                                    </div>
+                                                </div>
+                                                <div className="mt-3 text-sm leading-relaxed text-zinc-600">{member.role}</div>
+                                            </div>
+                                        ))}
+                                    </div>
+
+                                    <div className="mt-4 rounded-2xl border border-amber-200 bg-amber-50 p-3">
+                                        <div className="text-sm font-semibold text-zinc-900">Presentation shortcut</div>
+                                        <div className="mt-1 text-sm text-zinc-600 leading-relaxed">
+                                            Hit <span className="font-semibold">Start Demo</span> to auto-run a fake bank scam scenario instantly.
+                                        </div>
+                                    </div>
+
+                                    <div className="mt-5 flex flex-col sm:flex-row gap-2 sm:justify-end">
+                                        <button
+                                            onClick={() => setShowModal(false)}
+                                            className="rounded-full border border-zinc-300 bg-white px-5 py-3 text-sm font-semibold text-zinc-700 shadow-sm hover:bg-zinc-50"
+                                        >
+                                            Enter App
+                                        </button>
+                                        <button
+                                            onClick={startDemo}
+                                            className="rounded-full bg-zinc-900 px-6 py-3 text-sm font-semibold text-white shadow-lg hover:opacity-95"
+                                        >
+                                            Start Demo
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    )}
+
+                    <div className="max-w-7xl mx-auto px-4 py-6 md:py-10">
+                        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 items-center min-h-[85vh]">
+                            <div className="order-2 lg:order-1">
+                                <div className="inline-flex items-center gap-3 rounded-full bg-white/80 backdrop-blur px-4 py-2 shadow-sm border border-white/60">
+                                    <TeamLogo small />
+                                    <div className="text-left">
+                                        <div className="text-sm font-semibold text-zinc-900">Straits Of Hormuz Team</div>
+                                        <div className="text-xs text-zinc-500">AI Hackathon Prototype</div>
+                                    </div>
+                                </div>
+
+                                <div className="mt-6">
+                                    <h1 className="text-4xl md:text-5xl font-bold tracking-tight text-zinc-900 leading-tight">
+                                        Scam Shield
+                                    </h1>
+                                    <p className="mt-4 text-base md:text-lg text-zinc-600 max-w-xl leading-relaxed">
+                                        A mobile-first AI scam detection prototype that analyzes suspicious text,
+                                        estimates scam probability, and turns the result into a polished evidence card.
+                                    </p>
+                                </div>
+
+                                <div className="mt-6 flex flex-wrap gap-3">
+                                    <button
+                                        onClick={screenshot}
+                                        className="rounded-full bg-zinc-900 text-white px-5 py-3 text-sm font-semibold shadow-lg hover:opacity-95 transition"
+                                    >
+                                        Capture Phone Screenshot
+                                    </button>
+                                    <button
+                                        onClick={clearChat}
+                                        className="rounded-full bg-white/80 backdrop-blur px-5 py-3 text-sm font-semibold text-zinc-700 shadow-sm border border-white/60 hover:bg-white"
+                                    >
+                                        Reset Demo
+                                    </button>
+                                    <button
+                                        onClick={() => setShowModal(true)}
+                                        className="rounded-full bg-white/80 backdrop-blur px-5 py-3 text-sm font-semibold text-zinc-700 shadow-sm border border-white/60 hover:bg-white"
+                                    >
+                                        Team Intro
+                                    </button>
+                                </div>
+
+                                <div className="mt-8">
+                                    <div className="text-sm font-semibold text-zinc-800 mb-3">
+                                        Demo Presets
+                                    </div>
+                                    <div className="flex flex-wrap gap-3">
+                                        {presets.map((preset) => (
+                                            <button
+                                                key={preset.label}
+                                                onClick={() => usePreset(preset.text)}
+                                                disabled={loading}
+                                                className="rounded-2xl bg-white/80 backdrop-blur px-4 py-3 text-sm font-medium text-zinc-700 shadow-sm border border-white/60 hover:bg-white disabled:opacity-50"
+                                            >
+                                                {preset.label}
+                                            </button>
+                                        ))}
+                                    </div>
+                                </div>
+
+                                <div className="mt-8 grid grid-cols-1 sm:grid-cols-3 gap-4">
+                                    <div className="rounded-2xl bg-white/70 backdrop-blur p-4 shadow-sm border border-white/60">
+                                        <div className="text-xs uppercase tracking-wide text-zinc-500">Input</div>
+                                        <div className="mt-2 text-sm font-medium text-zinc-900">
+                                            Paste suspicious message content
+                                        </div>
+                                    </div>
+
+                                    <div className="rounded-2xl bg-white/70 backdrop-blur p-4 shadow-sm border border-white/60">
+                                        <div className="text-xs uppercase tracking-wide text-zinc-500">Analysis</div>
+                                        <div className="mt-2 text-sm font-medium text-zinc-900">
+                                            AI score, reasons, and safe action
+                                        </div>
+                                    </div>
+
+                                    <div className="rounded-2xl bg-white/70 backdrop-blur p-4 shadow-sm border border-white/60">
+                                        <div className="text-xs uppercase tracking-wide text-zinc-500">Output</div>
+                                        <div className="mt-2 text-sm font-medium text-zinc-900">
+                                            Screenshot-ready mobile result
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div className="order-1 lg:order-2 flex justify-center lg:justify-end">
+                                <div
+                                    ref={phoneRef}
+                                    className="relative w-[320px] h-[650px] sm:w-[360px] sm:h-[740px] rounded-[3.2rem] sm:rounded-[3.5rem] bg-gradient-to-b from-zinc-700 via-zinc-900 to-black p-[10px] shadow-[0_30px_100px_rgba(0,0,0,0.25)]"
+                                >
+                                    <div className="absolute -left-1 top-28 w-1 h-14 bg-zinc-500 rounded-full"></div>
+                                    <div className="absolute -left-1 top-44 w-1 h-20 bg-zinc-500 rounded-full"></div>
+                                    <div className="absolute -right-1 top-36 w-1 h-24 bg-zinc-500 rounded-full"></div>
+                                    <div className="absolute inset-0 rounded-[3.2rem] sm:rounded-[3.5rem] border border-white/10 pointer-events-none"></div>
+
+                                    <div className="relative w-full h-full rounded-[2.8rem] sm:rounded-[3rem] overflow-hidden bg-[#fffdf9] flex flex-col">
+                                        <div className="absolute top-0 left-1/2 -translate-x-1/2 z-20 w-36 sm:w-40 h-7 bg-black rounded-b-2xl"></div>
+
+                                        <div className="pt-10 pb-3 px-4 border-b border-zinc-200 bg-white/95 backdrop-blur">
+                                            <div className="flex items-center justify-between text-[11px] text-zinc-500 font-medium">
+                                                <span>9:41</span>
+                                                <span>Scam Shield</span>
+                                                <span>AI Active</span>
+                                            </div>
+                                            <div className="mt-3 flex items-center gap-3">
+                                                <div className="w-10 h-10 rounded-full bg-zinc-900 text-white flex items-center justify-center text-sm font-bold shadow-sm overflow-hidden">
+                                                    <TeamLogo small />
+                                                </div>
+                                                <div className="text-left">
+                                                    <div className="text-sm font-semibold text-zinc-900">Scam Detector</div>
+                                                    <div className="text-xs text-zinc-500">Straits Of Hormuz Team</div>
+                                                </div>
+                                            </div>
+                                        </div>
+
+                                        <div className="flex-1 overflow-y-auto p-4 space-y-3 bg-[linear-gradient(180deg,#fffaf3_0%,#f9f3ec_100%)]">
+                                            {messages.map(renderMessage)}
+
+                                            {loading && (
+                                                <div className="flex justify-start">
+                                                    <div className="bg-white border border-zinc-200 text-zinc-500 rounded-2xl rounded-bl-md px-4 py-3 text-sm shadow-sm">
+                                                        Analyzing message risk...
+                                                    </div>
+                                                </div>
+                                            )}
+
+                                            <div ref={endRef}></div>
+                                        </div>
+
+                                        <div className="p-3 border-t border-zinc-200 bg-white">
+                                            <div className="flex gap-2">
+                                                <textarea
+                                                    rows="2"
+                                                    className="flex-1 resize-none rounded-2xl border border-zinc-300 px-4 py-3 text-sm outline-none focus:border-zinc-500"
+                                                    placeholder="Paste suspicious text here..."
+                                                    value={input}
+                                                    onChange={(e) => setInput(e.target.value)}
+                                                    onKeyDown={onKeyDown}
+                                                />
+                                                <button
+                                                    onClick={send}
+                                                    disabled={loading}
+                                                    className="self-end rounded-2xl bg-zinc-900 text-white px-5 py-3 text-sm font-semibold shadow-sm disabled:opacity-50"
+                                                >
+                                                    Send
+                                                </button>
+                                            </div>
+                                            <div className="mt-2 text-[11px] text-zinc-400 text-center">
+                                                Enter to send • Shift+Enter for new line
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            );
+        }
+
+        ReactDOM.createRoot(document.getElementById("root")).render(<App />);
+    </script>
+</body>
+
+</html>
