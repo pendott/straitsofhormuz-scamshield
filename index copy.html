@@ -1,0 +1,174 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <meta charset="UTF-8" />
+    <title>Scam Detector</title>
+
+    <!-- React CDN -->
+    <script src="https://unpkg.com/react@18/umd/react.development.js"></script>
+    <script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
+
+    <!-- Babel (for JSX) -->
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+
+    <!-- Tailwind CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+
+    <!-- Screenshot CDN -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+</head>
+
+<body>
+
+    <div id="root"></div>
+
+    <script type="text/babel">
+
+        function App() {
+            const { useState, useRef, useEffect } = React;
+
+            const [messages, setMessages] = useState([
+                { text: "Paste scam message here.", sender: "bot" }
+            ]);
+
+            const [input, setInput] = useState("");
+            const [loading, setLoading] = useState(false);
+
+            const phoneRef = useRef();
+            const endRef = useRef();
+
+            useEffect(() => {
+                endRef.current?.scrollIntoView({ behavior: "smooth" });
+            }, [messages]);
+
+            const send = async () => {
+                if (!input.trim()) return;
+
+                setMessages(prev => [...prev, { text: input, sender: "user" }]);
+                setLoading(true);
+
+                try {
+                    const res = await fetch("http://192.168.1.22:8000/api/analyze", {
+                        method: "POST",
+                        headers: { "Content-Type": "application/json" },
+                        body: JSON.stringify({ message: input })
+                    });
+
+                    const data = await res.json();
+
+                    setMessages(prev => [...prev, {
+                        text: `${data.verdict}
+
+Type: ${data.scam_type}
+Risk: ${data.risk_level} (${data.risk_score}%)
+
+- ${data.reasons.join("\n- ")}`,
+                        sender: "bot"
+                    }]);
+
+                } catch {
+                    setMessages(prev => [...prev, {
+                        text: "Backend not connected.",
+                        sender: "bot"
+                    }]);
+                }
+
+                setInput("");
+                setLoading(false);
+            };
+
+            const screenshot = async () => {
+                const canvas = await html2canvas(phoneRef.current, {
+                    scale: 2,
+                    backgroundColor: null
+                });
+
+                const link = document.createElement("a");
+                link.download = "scam-detection.png";
+                link.href = canvas.toDataURL();
+                link.click();
+            };
+
+            return (
+                <div className="min-h-screen flex items-center justify-center"
+                    style={{
+                        background: "linear-gradient(135deg, #fdf6f0, #f3ecff, #eefaf3)"
+                    }}
+                >
+
+                    <div className="text-center">
+
+                        <div className="mb-4 flex justify-center gap-3">
+                            <button
+                                onClick={screenshot}
+                                className="bg-white px-4 py-2 rounded shadow text-sm"
+                            >
+                                📸 Screenshot
+                            </button>
+                        </div>
+
+                        {/* PHONE */}
+                        <div ref={phoneRef}
+                            className="relative w-[360px] h-[740px] rounded-[3.5rem]
+          bg-gradient-to-b from-zinc-700 via-zinc-900 to-black
+          p-[10px] shadow-2xl">
+
+                            {/* notch */}
+                            <div className="absolute top-0 left-1/2 -translate-x-1/2 w-40 h-7 bg-black rounded-b-2xl"></div>
+
+                            {/* screen */}
+                            <div className="bg-white w-full h-full rounded-[3rem] flex flex-col overflow-hidden">
+
+                                <div className="pt-10 pb-2 text-center text-sm border-b">
+                                    Scam Shield
+                                </div>
+
+                                {/* chat */}
+                                <div className="flex-1 overflow-auto p-3 space-y-2 bg-[#faf6f2]">
+                                    {messages.map((m, i) => (
+                                        <div key={i} className={m.sender === "user" ? "text-right" : ""}>
+                                            <div className={`inline-block px-3 py-2 rounded-lg text-sm ${m.sender === "user"
+                                                ? "bg-black text-white"
+                                                : "bg-gray-200"
+                                                }`}>
+                                                {m.text}
+                                            </div>
+                                        </div>
+                                    ))}
+
+                                    {loading && <div className="text-xs text-gray-400">analyzing...</div>}
+
+                                    <div ref={endRef}></div>
+                                </div>
+
+                                {/* input */}
+                                <div className="p-2 border-t flex">
+                                    <input
+                                        className="flex-1 p-2 border rounded-l"
+                                        value={input}
+                                        onChange={(e) => setInput(e.target.value)}
+                                    />
+                                    <button
+                                        onClick={send}
+                                        className="bg-black text-white px-4 rounded-r"
+                                    >
+                                        Send
+                                    </button>
+                                </div>
+
+                            </div>
+                        </div>
+
+                    </div>
+                </div>
+            );
+        }
+
+        ReactDOM.createRoot(document.getElementById("root")).render(<App />);
+
+    </script>
+
+</body>
+
+</html>
